@@ -7,8 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wiringPi.h>
 
 #include "led-matrix-c.h" // for matrix controls
+
+//hardware pins
+#define LMOVEPIN 28
+#define RMOVEPIN 29
 
 
 typedef struct {
@@ -48,9 +53,14 @@ void printMelody();
 //void init_matrix();
 void print_matrix(char image[32][32], struct LedCanvas *canvas, int speed);
 void printLEDDefault();
+void loop();
+void leftShift();
+void rightShift();
+void initPin();
 
 int main(int argc, char **argv) {
-	
+
+	initPin(); // should come first	
 	struct RGBLedMatrixOptions options;
 	memset(&options, 0, sizeof(options));
 	options.rows = 32;
@@ -62,11 +72,25 @@ int main(int argc, char **argv) {
 		return 1;
 	
 	realtime_canvas = led_matrix_get_canvas(matrix);
-//	led_canvas_get_size(realtime_canvas, &width, &height);
-	
 
 	dataload();
 	printData();
+
+	//enter main loop
+	loop();
+}
+
+void initPin(){
+
+	wiringPiSetup();
+	pinMode(LMOVEPIN, INPUT);
+	pinMode(RMOVEPIN, INPUT);
+
+	// attach interrupts
+	
+	//wiringPiISR(LMOVEPIN, INT_EDGE_RISING, leftShift);
+	//wiringPiISR(RMOVEPIN, INT_EDGE_RISING, rightShift);	
+
 }
 
 int dataload() {
@@ -198,31 +222,60 @@ void printData() {
 		}
 	}
 
-	printLEDDefault();
+//	printLEDDefault();
 
 }
+
+
+void loop(){
+	
+	while(1){
+		int lpinin, rpinin;
+
+		printLEDDefault();
+		
+		
+		//detect pin
+		
+		lpinin = digitalRead(LMOVEPIN);
+		rpinin = digitalRead(RMOVEPIN);
+
+		if(lpinin == 1){
+			printf("lpin %d, rpin: %d \n", lpinin, rpinin);
+			//leftShift();
+		}
+		if(rpinin == 1){
+			printf("lpin %d, rpin: %d \n", lpinin, rpinin);
+			//rightShift();
+		}
+
+
+	}
+
+}
+
 
 void printLEDDefault() {
 	
 	int speed = 2000;
-	while (1) {
 		
-		int i;
-		int x, y;
-		int r = 100;
-		int random_r, random_g, random_b;
-		for(y = 0; y < 32; y++){
-			for(x = 0; x < 32; x++){
-				random_r = rand() % 50;
-				random_g = rand() % 50;
-				random_b = rand() % 50;					
-				led_canvas_set_pixel(realtime_canvas,y,x,x,y,random_b);
-				usleep(speed);
-			}
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	for(y = 0; y < 32; y++){
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 50;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,y,random_b);
+			usleep(speed);
 		}
+	}
 	sleep(1);
 	led_canvas_clear(realtime_canvas);
-	}
+
+
 }
 
 
@@ -253,6 +306,51 @@ void shiftImage() {
 		//delay(100);
 	}
 	//delay(1000);
+}
+
+
+void leftShift(){
+	// function for defaut led shift
+	
+	int j;
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	for(y = 0; y < 32; y++){
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 50;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,0,2);
+			usleep(500);
+		}
+	}
+	usleep(100);
+	led_canvas_clear(realtime_canvas);
+
+}
+
+void rightShift(){
+	// function for defaut led shift
+	
+	int i;
+	int j;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	for(y = 31; y >= 0; y--){
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 50;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,2,0);
+			usleep(500);
+		}
+	}
+	usleep(100);
+	led_canvas_clear(realtime_canvas);
+
 }
 
 
