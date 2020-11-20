@@ -79,6 +79,7 @@ void initPin();
 void interruptTest();
 void datasync();
 void printLedData();
+void printLEDEnd();
 
 
 // signal handlers for led matrix delete
@@ -96,7 +97,7 @@ void *datathread(void *args){
 	printf("data thread active \n");
 
 	while(1){
-		sleep(2); // 100 seconds update
+		sleep(100); // 100 seconds update
 		int res = dataload();
 		datasync();
 		printf("auto data retrieve: %d \n", res);
@@ -130,6 +131,7 @@ int main(int argc, char **argv) {
 
 	//init variables
 	userMatrix.currentViewIndex = -1;
+	history.lastIndex = userMatrix.currentViewIndex;
 
 
 	dataload();
@@ -153,7 +155,12 @@ void leftShift(){
 	int r = 100;
 	int random_r, random_g, random_b;
 	int size_count = 0;
-	printf("yo");
+	//printf("yo");
+	if(userMatrix.currentViewIndex > -1){ // view previous
+		userMatrix.currentViewIndex --;
+		history.lastIndex = userMatrix.currentViewIndex;
+	}
+	printf("screen stat: %d index \n", userMatrix.currentViewIndex);
 	for(y = 0; y < 32; y++){
 		size_count++;
 		for(x = 0; x < 32; x++){
@@ -167,9 +174,6 @@ void leftShift(){
 			usleep(500);
 
 		}
-	}
-	if(userMatrix.currentViewIndex > -1){ // view previous
-		userMatrix.currentViewIndex --;
 	}
 	usleep(100);
 	led_canvas_clear(realtime_canvas);
@@ -188,6 +192,11 @@ void rightShift(){
 	int r = 100;
 	int random_r, random_g, random_b;
 	int size_count=0;
+	if(userMatrix.currentViewIndex < animation_n){
+		userMatrix.currentViewIndex ++;
+		history.lastIndex = userMatrix.currentViewIndex;
+	}
+	printf("screen stat: %d index \n", userMatrix.currentViewIndex);
 	for(y = 31; y >= 0; y--){
 		size_count++;
 		for(x = 0; x < 32; x++){
@@ -201,9 +210,6 @@ void rightShift(){
 		
 			usleep(500);
 		}
-	}
-	if(userMatrix.currentViewIndex < animation_n){
-		userMatrix.currentViewIndex ++;
 	}
 	usleep(100);
 	led_canvas_clear(realtime_canvas);
@@ -337,6 +343,7 @@ void datasync(){
 		
 		printf("new data recieved, diff : %d \n", animation_n - history.anim_n);
 		history.anim_n = animation_n;
+		//userMatrix.currentViewIndex = history.lastIndex; // uncomment to see latest in every update
 	}
 	else{
 		printf("data is same \n");
@@ -386,8 +393,11 @@ void loop(){
 		//led_canvas_clear(realtime_canvas);
 		int lpinin, rpinin;
 		
-		if(userMatrix.currentViewIndex == -1){
+		if(userMatrix.currentViewIndex == -1){ // start data
 			printLEDDefault();
+		}
+		else if(userMatrix.currentViewIndex >= animation_n){ // end of data
+			printLEDEnd();
 		}
 		else{
 			printLedData();
@@ -426,7 +436,7 @@ void printLEDDefault() {
 		for(x = 0; x < 32; x++){
 			random_r = rand() % 50;
 			random_g = rand() % 50;
-			random_b = rand() % 50;					
+			random_b = rand() % 60;					
 			led_canvas_set_pixel(realtime_canvas,y,x,x,y,random_b);
 			usleep(speed);
 			lpinin = digitalRead(LMOVEPIN);
@@ -445,6 +455,43 @@ void printLEDDefault() {
 		sleep(1);
 		led_canvas_clear(realtime_canvas);
 	}
+
+}
+
+void printLEDEnd(){
+	int speed = 2000;
+	int rpinin=0, lpinin=0;		
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	int shift_flag = 0;
+	for(y = 31; y >= 0; y--){
+		shift_flag = 0;
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 60;					
+			led_canvas_set_pixel(realtime_canvas,y,x,y,random_b,x);
+			usleep(speed);
+			lpinin = digitalRead(LMOVEPIN);
+			rpinin = digitalRead(RMOVEPIN);
+			if(lpinin == 1 || rpinin == 1) {
+				shift_flag = 1;
+				break;
+			}
+		}
+		if(shift_flag == 1){
+			printf("flag! \n");
+			break;
+		}
+	}
+	if(shift_flag == 0){
+		sleep(1);
+		led_canvas_clear(realtime_canvas);
+	}
+
+
 
 }
 
