@@ -230,7 +230,7 @@ void initPin(){
 }
 
 int dataload() {
-	FILE* fp = fopen("../client/PiryServer/clientUpload/data1.txt", "r");
+	FILE* fp = fopen("../client/PiryServer/clientUpload/data.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
 		char* tokptr;
@@ -245,37 +245,51 @@ int dataload() {
 
 		/* Read file info */
 		fgets(dummy, sizeof(dummy), fp); // last update time
+		//getchar();
 		read_count = fscanf(fp, "%s %d", dummy, &animation_n);
+		//getchar();
 		animations = (Animation*)malloc(sizeof(Animation) * animation_n);
-
+		printf("read fike info: a num: %d\n", animation_n);
 		/* Read data */
-		fseek(fp, 2, SEEK_CUR);
+		fseek(fp, 1, SEEK_CUR);
 		while (!feof(fp)) {
 			fgets(dummy, sizeof(dummy), fp); // read dummy : #animation index
 			read_count = fscanf(fp, " %s %s", dummy, animations[aniIndex].name); // read name
+			if(read_count == -1){
+				break;
+			}
 			read_count = fscanf(fp, " %s %d", dummy, &animations[aniIndex].length); // read length
 			animations[aniIndex].images = (Image*)malloc(sizeof(Image) * animations[aniIndex].length);
-			fseek(fp, 2, SEEK_CUR);
-
+			fseek(fp, 1, SEEK_CUR);
+			printf("readcount : %d, name: %s, length: %d\n", read_count, animations[aniIndex].name, animations[aniIndex].length);
 			/* read delay */
 			tokindex = 0;
 			fgets(dummy, sizeof(dummy), fp);
+			printf("dummy : %s \n", dummy);
 			strcpy(buffer, dummy + 6);
+			printf("buffer :%s \n", buffer); // buffer contain only delay numbers
 			tokptr = strtok(buffer, " ");
+			printf("first char of buffer!! : %c \n", buffer[0]);
 			while (tokptr != NULL) {
+				printf("token ptr : %s\n", tokptr);
+				if(tokptr != NULL){
 				animations[aniIndex].images[tokindex].delay = atoi(tokptr);
 				tokindex++;
+				}
+				//animations[aniIndex].images[tokindex].delay = atoi(tokptr);
+				printf("while read image delay: %d \n", animations[aniIndex].images[tokindex-1].delay);
+				//tokindex++;
 				tokptr = strtok(NULL, " ");
 			}
-
+			printf("read last image delay: %d \n", animations[aniIndex].images[tokindex-1].delay);
 			read_count = fscanf(fp, " %s %d", dummy, &hasMelody); // read hasMelody
-
+			printf("hasmelody : %d\n", hasMelody);
 			if (hasMelody == 1) { // has song
 				animations[aniIndex].melody.hasMelody = 1;
 
 				/* read num_of_note*/
 				read_count = fscanf(fp, " %s %d", dummy, &animations[aniIndex].melody.note_n);
-				fseek(fp, 2, SEEK_CUR);
+				fseek(fp, 1, SEEK_CUR);
 
 				/* read melody */
 				tokindex = 0;
@@ -300,17 +314,20 @@ int dataload() {
 				}
 			}
 			else { // don't have song
+				printf("no melody \n");
 				animations[aniIndex].melody.hasMelody = 0;
 				animations[aniIndex].melody.note_n = 0;
 				animations[aniIndex].melody.duration = NULL;
 				animations[aniIndex].melody.frequency = NULL;
-				fseek(fp, 2, SEEK_CUR);
+				fseek(fp, 1, SEEK_CUR);
 			}
 
 			/* read pixel info */
-			fseek(fp, 2, SEEK_CUR);
+			fseek(fp, 1, SEEK_CUR);
+			printf("animation length: %d frames \n", animations[aniIndex].length);
 			for (int imageIndex = 0; imageIndex < animations[aniIndex].length; imageIndex++) {
 				fgets(dummy, sizeof(dummy), fp); // dummy read : @image1
+				//printf("image num : %s \n", dummy);
 				for (int pixel_row = 0; pixel_row < IMAGE_SIZE; pixel_row++) {
 					fgets(buffer, sizeof(buffer), fp);
 					for (int pixel_col = 0; pixel_col < IMAGE_SIZE; pixel_col++) {
