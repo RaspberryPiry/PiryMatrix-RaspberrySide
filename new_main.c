@@ -7,8 +7,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <wiringPi.h>
+#include <signal.h>
+#include <pthread.h>
+
 
 #include "led-matrix-c.h" // for matrix controls
+
+//hardware pins
+#define LMOVEPIN 28
+#define RMOVEPIN 29
 
 
 typedef struct {
@@ -30,8 +38,24 @@ typedef struct {
 	Image* images;
 }Animation;
 
+typedef struct {
+	int newIndex; // start index pointer
+	int isNewData; // 0 if no, 1 if yes
+	int lastIndex;
+	int anim_n; // 
+}History;
+
+typedef struct {
+	int currentViewIndex;
+	int isActive; // for auto screen off
+
+}MatrixStatus;
+
+
 /*global variable*/
 Animation* animations;
+MatrixStatus userMatrix;
+History history;
 int animation_n;
 int animation_index;
 int melodyOn;
@@ -48,9 +72,44 @@ void printMelody();
 //void init_matrix();
 void print_matrix(char image[32][32], struct LedCanvas *canvas, int speed);
 void printLEDDefault();
+void loop();
+void leftShift();
+void rightShift();
+void initPin();
+void interruptTest();
+void datasync();
+void printLedData();
+void printLEDEnd();
+
+
+// signal handlers for led matrix delete
+void sigint_handler(int signum){
+
+	printf("closing... \n");	
+	led_matrix_delete(matrix);
+	exit(signum);
+
+}
+
+// multithread funcssdtions
+
+void *datathread(void *args){
+	printf("data thread active \n");
+
+	while(1){
+		sleep(100); // 100 seconds update
+		int res = dataload();
+		datasync();
+		printf("auto data retrieve: %d \n", res);
+	}
+	return NULL;
+}
+
+
 
 int main(int argc, char **argv) {
-	
+
+	initPin(); // should come first	
 	struct RGBLedMatrixOptions options;
 	memset(&options, 0, sizeof(options));
 	options.rows = 32;
@@ -62,15 +121,116 @@ int main(int argc, char **argv) {
 		return 1;
 	
 	realtime_canvas = led_matrix_get_canvas(matrix);
-//	led_canvas_get_size(realtime_canvas, &width, &height);
-	
+
+	// ctrl + c interrupt handler
+	signal(SIGINT, sigint_handler);
+
+	// create thread for data update
+	pthread_t dataThread;
+	pthread_create(&dataThread, NULL, datathread, NULL);
+
+	//init variables
+	userMatrix.currentViewIndex = -1;
+	history.lastIndex = userMatrix.currentViewIndex;
+
 
 	dataload();
+	datasync();
 	printData();
+
+	//enter main loop
+	loop();
+}
+void interruptTest(){
+	printf("interrupt!!\n");
+}
+void leftShift(){
+	// function for defaut led shift
+	printf("int left \n ");	
+//	led_canvas_clear(realtime_canvas);
+	int size = 5;
+	int j;
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	int size_count = 0;
+	//printf("yo");
+	if(userMatrix.currentViewIndex > -1){ // view previous
+		userMatrix.currentViewIndex --;
+		history.lastIndex = userMatrix.currentViewIndex;
+	}
+	printf("screen stat: %d index \n", userMatrix.currentViewIndex);
+	for(y = 0; y < 32; y++){
+		size_count++;
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 50;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,0,2);
+			if(size_count > size){
+				led_canvas_set_pixel(realtime_canvas,y-size,x,0,0,0);
+			}
+			usleep(500);
+
+		}
+	}
+	usleep(100);
+	led_canvas_clear(realtime_canvas);
+
+}
+
+void rightShift(){
+	// function for defaut led shift
+	printf("int right \n");
+
+//	led_canvas_clear(realtime_canvas);
+	int size = 5;
+	int i;
+	int j;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	int size_count=0;
+	if(userMatrix.currentViewIndex < animation_n){
+		userMatrix.currentViewIndex ++;
+		history.lastIndex = userMatrix.currentViewIndex;
+	}
+	printf("screen stat: %d index \n", userMatrix.currentViewIndex);
+	for(y = 31; y >= 0; y--){
+		size_count++;
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 50;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,2,0);
+			if(size_count > size){
+				led_canvas_set_pixel(realtime_canvas,y+size,x,0,0,0);
+			}
+		
+			usleep(500);
+		}
+	}
+	usleep(100);
+	led_canvas_clear(realtime_canvas);
+
+}
+
+void initPin(){
+
+	wiringPiSetup();
+	pinMode(LMOVEPIN, INPUT);
+	pinMode(RMOVEPIN, INPUT);
+
+	// attach interrupts
+	
+	wiringPiISR(LMOVEPIN, INT_EDGE_RISING, leftShift);
+	wiringPiISR(RMOVEPIN, INT_EDGE_RISING, rightShift);	
+
 }
 
 int dataload() {
-	FILE* fp = fopen("data.txt", "r");
+	FILE* fp = fopen("../client/PiryServer/clientUpload/data1.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
 		char* tokptr;
@@ -79,6 +239,9 @@ int dataload() {
 		int aniIndex = 0;
 		int read_count; // why need? -> need by return value of fscanf func
 		int hasMelody = 0;
+		
+		// first free before data
+		free(animations);
 
 		/* Read file info */
 		fgets(dummy, sizeof(dummy), fp); // last update time
@@ -168,6 +331,29 @@ int dataload() {
 	}
 }
 
+
+
+
+void datasync(){
+	// syncs old data.txt and updated one.
+	if(history.anim_n != animation_n){
+		history.isNewData = 1; // newData flag
+		history.newIndex = history.lastIndex+1; // from next
+		//history.lastIndex = animation_n;
+		
+		printf("new data recieved, diff : %d \n", animation_n - history.anim_n);
+		history.anim_n = animation_n;
+		//userMatrix.currentViewIndex = history.lastIndex; // uncomment to see latest in every update
+	}
+	else{
+		printf("data is same \n");
+	}
+
+
+
+}
+
+
 void printData() {
 	printf("show animation\n\n");
 	for (int i = 0; i < animation_n; i++) {
@@ -194,35 +380,131 @@ void printData() {
 			}
 			printf("\n");
 			
-			print_matrix(animations[i].images[j].pixels, realtime_canvas, animations[i].images[j].delay+5000);
+			print_matrix(animations[i].images[j].pixels, realtime_canvas, animations[i].images[j].delay);
 		}
 	}
 
-	printLEDDefault();
+}
+
+
+void loop(){
+	
+	while(1){
+		//led_canvas_clear(realtime_canvas);
+		int lpinin, rpinin;
+		
+		if(userMatrix.currentViewIndex == -1){ // start data
+			printLEDDefault();
+		}
+		else if(userMatrix.currentViewIndex >= animation_n){ // end of data
+			printLEDEnd();
+		}
+		else{
+			printLedData();
+		}
+		//detect pin
+		
+		lpinin = digitalRead(LMOVEPIN);
+		rpinin = digitalRead(RMOVEPIN);
+		
+	//	printf("lpin %d, rpin: %d \n", lpinin, rpinin);
+		if(rpinin == 1){
+	//		printf("lpin %d, rpin: %d \n", lpinin, rpinin);
+	//		rightShift();
+		}
+		if(lpinin == 1){
+	//		printf("lpin %d, rpin: %d \n", lpinin, rpinin);
+	//		leftShift();
+		}
+
+	}
 
 }
+
 
 void printLEDDefault() {
 	
 	int speed = 2000;
-	while (1) {
-		
-		int i;
-		int x, y;
-		int r = 100;
-		int random_r, random_g, random_b;
-		for(y = 0; y < 32; y++){
-			for(x = 0; x < 32; x++){
-				random_r = rand() % 50;
-				random_g = rand() % 50;
-				random_b = rand() % 50;					
-				led_canvas_set_pixel(realtime_canvas,y,x,x,y,random_b);
-				usleep(speed);
+	int rpinin=0, lpinin=0;		
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	int shift_flag = 0;
+	for(y = 0; y < 32; y++){
+		shift_flag = 0;
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 60;					
+			led_canvas_set_pixel(realtime_canvas,y,x,x,y,random_b);
+			usleep(speed);
+			lpinin = digitalRead(LMOVEPIN);
+			rpinin = digitalRead(RMOVEPIN);
+			if(lpinin == 1 || rpinin == 1) {
+				shift_flag = 1;
+				break;
 			}
 		}
-	sleep(1);
-	led_canvas_clear(realtime_canvas);
+		if(shift_flag == 1){
+			printf("flag! \n");
+			break;
+		}
 	}
+	if(shift_flag == 0){
+		sleep(1);
+		led_canvas_clear(realtime_canvas);
+	}
+
+}
+
+void printLEDEnd(){
+	int speed = 2000;
+	int rpinin=0, lpinin=0;		
+	int i;
+	int x, y;
+	int r = 100;
+	int random_r, random_g, random_b;
+	int shift_flag = 0;
+	for(y = 31; y >= 0; y--){
+		shift_flag = 0;
+		for(x = 0; x < 32; x++){
+			random_r = rand() % 50;
+			random_g = rand() % 50;
+			random_b = rand() % 60;					
+			led_canvas_set_pixel(realtime_canvas,y,x,y,random_b,x);
+			usleep(speed);
+			lpinin = digitalRead(LMOVEPIN);
+			rpinin = digitalRead(RMOVEPIN);
+			if(lpinin == 1 || rpinin == 1) {
+				shift_flag = 1;
+				break;
+			}
+		}
+		if(shift_flag == 1){
+			printf("flag! \n");
+			break;
+		}
+	}
+	if(shift_flag == 0){
+		sleep(1);
+		led_canvas_clear(realtime_canvas);
+	}
+
+
+
+}
+
+void printLedData(){
+	// print reserved data according to cursor
+	int rpinin=0, lpinin=0;		
+	int shift_flag = 0;
+
+	
+	for (int j = 0; j < animations[userMatrix.currentViewIndex].length; j++) {
+		print_matrix(animations[userMatrix.currentViewIndex].images[j].pixels, realtime_canvas, animations[userMatrix.currentViewIndex].images[j].delay);
+	}
+
 }
 
 
@@ -260,14 +542,15 @@ void print_matrix(char image[32][32], struct LedCanvas *canvas, int speed){
 	int i;
 	int x, y;
 	int r = 100;
-	for(i = 0; i < speed; i++){
-		for(y = 0; y < 32; y++){
-			for(x = 0; x < 32; x++){
-				if(image[x][y] == 1){
-					led_canvas_set_pixel(canvas,y,x,r,0,0);
-				}
+	for(y = 0; y < 32; y++){
+		for(x = 0; x < 32; x++){
+			if(image[x][y] == 1){
+				led_canvas_set_pixel(canvas,y,x,r,0,0);
 			}
+		
 		}
 	}
+	//printf("sleeping !! \n");
+	usleep(speed*100);
 	led_canvas_clear(canvas);
 }
