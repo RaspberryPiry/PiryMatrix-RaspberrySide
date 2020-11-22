@@ -230,7 +230,7 @@ void initPin(){
 }
 
 int dataload() {
-	FILE* fp = fopen("../client/PiryServer/clientUpload/data.txt", "r");
+	FILE* fp = fopen("../client/PiryServer/clientUpload/data1.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
 		char* tokptr;
@@ -417,6 +417,7 @@ void loop(){
 			printLEDEnd();
 		}
 		else{
+			printf("same!!\n");
 			printLedData();
 		}
 		//detect pin
@@ -519,7 +520,12 @@ void printLedData(){
 
 	
 	for (int j = 0; j < animations[userMatrix.currentViewIndex].length; j++) {
-		print_matrix(animations[userMatrix.currentViewIndex].images[j].pixels, realtime_canvas, animations[userMatrix.currentViewIndex].images[j].delay);
+		//printf("print led data!!\n");
+		if(userMatrix.currentViewIndex <  animation_n){
+		
+			print_matrix(animations[userMatrix.currentViewIndex].images[j].pixels, realtime_canvas, animations[userMatrix.currentViewIndex].images[j].delay);
+		}
+		//print_matrix(animations[userMatrix.currentViewIndex].images[j].pixels, realtime_canvas, animations[userMatrix.currentViewIndex].images[j].delay);
 	}
 
 }
