@@ -21,7 +21,7 @@
 
 typedef struct {
 	int delay;
-	char pixels[IMAGE_SIZE][IMAGE_SIZE];
+	int pixels[3][IMAGE_SIZE][IMAGE_SIZE];
 }Image;
 
 typedef struct {
@@ -54,6 +54,7 @@ typedef struct {
 
 /*global variable*/
 Animation* animations;
+Animation* boot;
 MatrixStatus userMatrix;
 History history;
 int animation_n;
@@ -66,11 +67,12 @@ struct LedCanvas *realtime_canvas;
 
 /*method*/
 int dataload();
+int loadBoot(char *dir);
 void printData();
 void printLED();
 void printMelody();
 //void init_matrix();
-void print_matrix(char image[32][32], struct LedCanvas *canvas, int speed);
+void print_matrix(int image[3][32][32], struct LedCanvas *canvas, int speed);
 void printLEDDefault();
 void loop();
 void leftShift();
@@ -229,8 +231,15 @@ void initPin(){
 
 }
 
+int loadBoot(char *dir){
+
+	FILE* fp = fopen(dir, "r");
+
+
+}
+
 int dataload() {
-	FILE* fp = fopen("../client/PiryServer/clientUpload/data1.txt", "r");
+	FILE* fp = fopen("rgbdata.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
 		char* tokptr;
@@ -249,7 +258,7 @@ int dataload() {
 		read_count = fscanf(fp, "%s %d", dummy, &animation_n);
 		//getchar();
 		animations = (Animation*)malloc(sizeof(Animation) * animation_n);
-		printf("read fike info: a num: %d\n", animation_n);
+		printf("read file info: a num: %d\n", animation_n);
 		/* Read data */
 		fseek(fp, 1, SEEK_CUR);
 		while (!feof(fp)) {
@@ -273,8 +282,8 @@ int dataload() {
 			while (tokptr != NULL) {
 				printf("token ptr : %s\n", tokptr);
 				if(tokptr != NULL){
-				animations[aniIndex].images[tokindex].delay = atoi(tokptr);
-				tokindex++;
+					animations[aniIndex].images[tokindex].delay = atoi(tokptr);
+					tokindex++;
 				}
 				//animations[aniIndex].images[tokindex].delay = atoi(tokptr);
 				printf("while read image delay: %d \n", animations[aniIndex].images[tokindex-1].delay);
@@ -327,16 +336,33 @@ int dataload() {
 			printf("animation length: %d frames \n", animations[aniIndex].length);
 			for (int imageIndex = 0; imageIndex < animations[aniIndex].length; imageIndex++) {
 				fgets(dummy, sizeof(dummy), fp); // dummy read : @image1
-				//printf("image num : %s \n", dummy);
+				printf("image num : %s \n", dummy);
 				for (int pixel_row = 0; pixel_row < IMAGE_SIZE; pixel_row++) {
-					fgets(buffer, sizeof(buffer), fp);
-					for (int pixel_col = 0; pixel_col < IMAGE_SIZE; pixel_col++) {
-						animations[aniIndex].images[imageIndex].pixels[pixel_row][pixel_col] = buffer[pixel_col] - 48;
-					}
-				}
-			}
-			aniIndex++;
-		}
+					fgets(dummy, sizeof(dummy), fp);
+					printf("pixel row : %s \n", dummy);
+
+              				tokptr = strtok(dummy, " ");
+ 			                for (int pixel_col = 0, colorIndex = 0; pixel_col < IMAGE_SIZE; pixel_col++) {
+                  				colorIndex = 0;
+       			          	 	buffer[0] = '0';
+                  				buffer[1] = 'x';
+				                strncpy(buffer + 2, tokptr, 2);
+                  				buffer[4] = '\0';
+                  				animations[aniIndex].images[imageIndex].pixels[colorIndex++][pixel_row][pixel_col] = strtol(buffer, NULL, 16);
+                  				strncpy(buffer + 2, tokptr + 2, 2);
+                  				buffer[4] = '\0';
+                  				animations[aniIndex].images[imageIndex].pixels[colorIndex++][pixel_row][pixel_col] = strtol(buffer, NULL, 16);
+                  				strncpy(buffer + 2, tokptr + 4, 2);
+                  				buffer[4] = '\0';
+                  				animations[aniIndex].images[imageIndex].pixels[colorIndex][pixel_row][pixel_col] = strtol(buffer, NULL, 16);
+                  				tokptr = strtok(NULL, " ");
+               				}
+               				printf("\n");
+            			}
+         		}
+         		printf("finish");
+         		aniIndex++;
+      		}
 		fclose(fp);
 		animation_index = 0;
 		melodyOn = 1;
@@ -391,14 +417,27 @@ void printData() {
 
 			for (int k = 0; k < IMAGE_SIZE; k++) {
 				for (int l = 0; l < IMAGE_SIZE; l++) {
-					printf("%d", animations[i].images[j].pixels[k][l]);
+					printf("(%d,%d,%d) ", animations[i].images[j].pixels[0][k][l], animations[i].images[j].pixels[1][k][l], animations[i].images[j].pixels[2][k][l]);				
 				}
 				printf("\n");
 			}
 			printf("\n");
 			
-			print_matrix(animations[i].images[j].pixels, realtime_canvas, animations[i].images[j].delay);
+		//	print_matrix(animations[i].images[j].pixels, realtime_canvas, animations[i].images[j].delay);
 		}
+	}
+
+	// show boot (temporory) //
+	for (int j = 0; j < animations[3].length; j++) {
+
+		for (int k = 0; k < IMAGE_SIZE; k++) {
+			for (int l = 0; l < IMAGE_SIZE; l++) {
+			}
+			printf("\n");
+		}
+		printf("\n");
+			
+		print_matrix(animations[3].images[j].pixels, realtime_canvas, animations[3].images[j].delay);
 	}
 
 }
@@ -561,19 +600,18 @@ void shiftImage() {
 }
 
 
-void print_matrix(char image[32][32], struct LedCanvas *canvas, int speed){
+void print_matrix(int image[3][32][32], struct LedCanvas *canvas, int speed){
 	int i;
 	int x, y;
 	int r = 100;
 	for(y = 0; y < 32; y++){
-		for(x = 0; x < 32; x++){
-			if(image[x][y] == 1){
-				led_canvas_set_pixel(canvas,y,x,r,0,0);
-			}
+		for(x = 0; x < 32; x++){		
+			//printf("{%d, %d, %d} ", image[0][x][y], image[1][x][y], image[2][x][y]);
+			led_canvas_set_pixel(canvas,x,y,image[0][x][y],image[1][x][y],image[2][x][y]);
 		
 		}
 	}
 	//printf("sleeping !! \n");
-	usleep(speed*100);
+	usleep(speed*1000);
 	led_canvas_clear(canvas);
 }
