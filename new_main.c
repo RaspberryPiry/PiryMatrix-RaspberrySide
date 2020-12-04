@@ -617,21 +617,6 @@ void printData() {
 		printf("\n");
 	}
 	
-	/*
-	// show boot (temporory) //
-	for (int j = 0; j < animations[3].length; j++) {
-
-		for (int k = 0; k < IMAGE_SIZE; k++) {
-			for (int l = 0; l < IMAGE_SIZE; l++) {
-			}
-			printf("\n");
-		}
-		printf("\n");
-			
-		print_matrix(animations[3].images[j].pixels, realtime_canvas, animations[3].images[j].delay);
-	}
-	*/
-
 }
 
 
