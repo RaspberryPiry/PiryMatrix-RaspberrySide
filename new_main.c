@@ -72,6 +72,8 @@ Animation *animations;
 
 Animation *boot;
 Animation *weather;
+Animation *erase_temp;
+
 MatrixStatus userMatrix;
 History history;
 
@@ -81,6 +83,7 @@ int animation_n;
 int animation_index;
 int melodyOn;
 int shift_flag=0;
+int update_ani_n;
 
 
 int boot_animation_n;
@@ -119,7 +122,8 @@ void printLedWeather();
 int *sendSerial();
 void itoa(int n, char s[]);
 void reverse(char s[]);
-
+void myalarm(int index);
+void eraseAnimation(int eindex);
 void *sendSerialDummy();
 
 
@@ -137,9 +141,21 @@ void *datathread(void *args){
 	printf("data thread active \n");
 
 	while(1){
-		sleep(100); // 100 seconds update
+		sleep(30); // 100 seconds updat
+		printf("current ani num %d \n", animation_n);
+		printf("update ani n: %d \n", update_ani_n);
+		printf("history ani n: %d \n", history.anim_n);
+
 		int res = dataload();
+		
+		sleep(2);
+		printf("after data ani num %d \n", animation_n);
+		
+		printf("update ani n: %d \n", update_ani_n);
+		printf("history ani n: %d \n", history.anim_n);
 		datasync();
+		printf("update ani n: %d \n", update_ani_n);
+		printf("history ani n: %d \n", history.anim_n);
 		printf("auto data retrieve: %d \n", res);
 		userMatrix.isActive = digitalRead(MOTIONPIN);
 		printf("userMatrix active: %d \n", userMatrix.isActive);
@@ -175,7 +191,8 @@ int main(int argc, char **argv) {
 	userMatrix.currentViewIndex = -1;
 	userMatrix.screenOff = 0;
 	history.lastIndex = userMatrix.currentViewIndex;
-
+	history.anim_n = 0;
+	update_ani_n = 0;
 
 	dataload();
 	bootload();
@@ -184,7 +201,6 @@ int main(int argc, char **argv) {
 	weatherStatus.currentWeather = 1;
 	userMatrix.isActive = digitalRead(MOTIONPIN);
 
-	//loadImages(weather, &weather_animation_n, wdir);
 	datasync();
 	printData();
 
@@ -251,10 +267,6 @@ void rightShift(){
 		history.lastIndex = userMatrix.currentViewIndex;
 	//	pthread_create(&serialThread, NULL, sendSerial, NULL);
 		printf("view index + 1 \n");
-
-	if(userMatrix.currentViewIndex < animation_n - 1){
-		pthread_create(&serialThread, NULL, sendSerial, NULL);
-	}
 		if(userMatrix.currentViewIndex < animation_n){
 			pthread_create(&serialThread, NULL, sendSerial, NULL);
 		}else{
@@ -322,6 +334,19 @@ void upShift(){
 	shift_flag = 0;
 }
 
+void eraseAnimation(int eindex){
+	
+	erase_temp = &animations[eindex];
+	
+	for(int i = eindex; i < animation_n - 1; i++){
+		animations[i] = animations[i+1];
+	}
+	myalarm(3);
+	printf("current anim num  %d \n", animation_n);
+	animation_n = animation_n - 1;
+	printf("new animation n %d \n", animation_n);
+}
+
 void downShift(){
 	// down to up
 
@@ -352,6 +377,7 @@ void downShift(){
 		}
 	}
 	printf("wait 1 sec \n");
+	eraseAnimation(userMatrix.currentViewIndex);
 	sleep(1);
 	for(x = 0; x < 32  ; x++){
 		for(y = 0; y < 32; y++){
@@ -381,10 +407,12 @@ void offButton(){
 	int size_count = 0;
 	int random_r, random_g, random_b;
 	if(userMatrix.screenOff == 1){
+		myalarm(0);
 		printf("screen ONNNN \n");
 		userMatrix.screenOff = 0;
 	}else{
 		userMatrix.screenOff = 1; // turn screen off
+		myalarm(1);
 		printf("wait 1 sec \n");
 		sleep(1);
 		for(y = 31; y >= 0; y--){
@@ -439,8 +467,10 @@ void initPin(){
 
 
 
+	//FILE* fp = fopen("rgbdata.txt", "r");
 
 int dataload() {
+	//FILE* fp = fopen("../../client/PiryServer/clientUpload/data.txt", "r");
 	FILE* fp = fopen("rgbdata.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
@@ -457,10 +487,17 @@ int dataload() {
 		/* Read file info */
 		fgets(dummy, sizeof(dummy), fp); // last update time
 		//getchar();
+		printf("dataload update n : %d \n", update_ani_n);
+		printf("dataload before ani_n : %d \n", animation_n);
+		int ttemp = animation_n;
+		update_ani_n = ttemp;
+		history.anim_n = ttemp;
 		read_count = fscanf(fp, "%s %d", dummy, &animation_n);
+		printf("dataload after update n : %d \n", update_ani_n);
+		printf("dataload after ani_n : %d \n", animation_n);
 		//getchar();
 		animations = (Animation*)malloc(sizeof(Animation) * animation_n);
-	//	printf("read file info: a num: %d\n", animation_n);
+		//printf("read file info: a num: %d\n", animation_n);
 		/* Read data */
 		fseek(fp, 1, SEEK_CUR);
 		while (!feof(fp)) {
@@ -472,7 +509,7 @@ int dataload() {
 			read_count = fscanf(fp, " %s %d", dummy, &animations[aniIndex].length); // read length
 			animations[aniIndex].images = (Image*)malloc(sizeof(Image) * animations[aniIndex].length);
 			fseek(fp, 1, SEEK_CUR);
-	//		printf("readcount : %d, name: %s, length: %d\n", read_count, animations[aniIndex].name, animations[aniIndex].length);
+		//	printf("readcount : %d, name: %s, length: %d\n", read_count, animations[aniIndex].name, animations[aniIndex].length);
 			/* read delay */
 			tokindex = 0;
 			fgets(dummy, sizeof(dummy), fp);
@@ -525,7 +562,7 @@ int dataload() {
 				}
 			}
 			else { // don't have song
-				printf("no melody \n");
+		//		printf("no melody \n");
 				animations[aniIndex].melody.hasMelody = 0;
 				animations[aniIndex].melody.note_n = 0;
 				animations[aniIndex].melody.duration = NULL;
@@ -562,7 +599,7 @@ int dataload() {
        //        				printf("\n");
             			}
          		}
-         		printf("data load finish");
+         		printf("ani data load finish \n");
          		aniIndex++;
       		}
 		fclose(fp);
@@ -706,7 +743,7 @@ int bootload() {
        //        				printf("\n");
             			}
          		}
-         		printf("data load finish");
+         		printf("boot data load finish\n");
          		aniIndex++;
       		}
 		fclose(fp);
@@ -843,7 +880,7 @@ int weatherload() {
        //        				printf("\n");
             			}
          		}
-         		printf("data load finish");
+         		printf("weather data load finish \n");
          		aniIndex++;
       		}
 		fclose(fp);
@@ -859,17 +896,26 @@ int weatherload() {
 
 void datasync(){
 	// syncs old data.txt and updated one.
-	if(history.anim_n != animation_n){
+	printf("history.anim_n : %d \n", history.anim_n);
+	printf("update n %d \n", update_ani_n);
+	printf("update_animation number : %d", animation_n);
+	if(history.anim_n != animation_n || update_ani_n != animation_n){
 		history.isNewData = 1; // newData flag
 		history.newIndex = history.lastIndex+1; // from next
 		//history.lastIndex = animation_n;
 		
 		printf("new data recieved, diff : %d \n", animation_n - history.anim_n);
 		history.anim_n = animation_n;
+		int *update = &update_ani_n;
+		//update_ani_n = animation_n;
+		printf("update_n updated : %d \n", update_ani_n);
+		*update = animation_n;
+		myalarm(1);
 		//userMatrix.currentViewIndex = history.lastIndex; // uncomment to see latest in every update
 	}
 	else{
 		printf("data is same \n");
+		printf("history : %d, anim_n : %d \n", history.anim_n, animation_n);
 	}
 }
 
@@ -923,7 +969,7 @@ void loop(){
 		}
 
 		else if(userMatrix.screenOff == 1){
-			printf("screenOff \n");
+			//printf("screenOff \n");
 		}
 		lpinin = digitalRead(LMOVEPIN);
 		rpinin = digitalRead(RMOVEPIN);
@@ -995,16 +1041,13 @@ int *sendSerial(){
 
 
 	
-	if ((fd = serialOpen("/dev/ttyACM1", 9600)) < 0)
+	if ((fd = serialOpen("/dev/ttyACM0", 9600)) < 0)
    	{		
       		fprintf(stderr, "Unable to open serial device: %s\n", strerror(errno));
       		return NULL;
    	}else{
 		printf("Serial Open!! \n");
 	}
-//	serialPuts(fd, len);
-//   	serialPuts(fd, freqs);
-//	serialPuts(fd, duras);
 	
 	// print only when index is > -1, < max
 	printf("sending data \n");
@@ -1018,11 +1061,25 @@ int *sendSerial(){
       		//fflush (stdout) ;
     	}
 	printf("serial_send_data : %s \n", data);
-//	printf("serial_recieved_data : %c \n", dd);
-	//	
-
 	return NULL;
 
+}
+
+void myalarm(int index)
+{
+	int fd;
+	char data[20] ="alarm&6";
+	data[6] = index + '0';
+	if ((fd = serialOpen("/dev/ttyACM0", 9600)) < 0)
+   	{		
+      		fprintf(stderr, "Unable to open serial device: %s\n", strerror(errno));
+      		return NULL;
+   	}else{
+		printf("Serial Open!! \n");
+	}
+	// print only when index is > -1, < max
+	printf("sending data \n");
+	serialPuts(fd, data);
 }
 
 void *sendSerialDummy(){
@@ -1035,17 +1092,13 @@ void *sendSerialDummy(){
 	strcat(data, r_newline);
 	
 	printf("serial_send_data : %s \n", data);
-	if ((fd = serialOpen("/dev/ttyACM1", 9600)) < 0)
+	if ((fd = serialOpen("/dev/ttyACM0", 9600)) < 0)
    	{		
       		fprintf(stderr, "Unable to open serial device: %s\n", strerror(errno));
       		return NULL;
    	}else{
 		printf("Serial Open!! \n");
-	}
-//	serialPuts(fd, len);
-//   	serialPuts(fd, freqs);
-//	serialPuts(fd, duras);
-	
+	}	
 	// print only when index is > -1, < max
 	printf("sending data \n");
 	serialPuts(fd, data);
@@ -1056,9 +1109,7 @@ void *sendSerialDummy(){
     	{
       		printf ("%c", serialGetchar (fd)) ;
       		//fflush (stdout) ;
-    	}
-	//printf("serial_send_data : %s \n", data);
-}
+    	}}
 
 void itoa(int n, char s[])
 {
@@ -1087,117 +1138,6 @@ void reverse(char s[])
      }
 } 
 
-int *sendSerial(){
-	
-	char *freqs;
-	char *duras;
-	char *title;
-	char buffer[10];
-	char space[] = "/";
-	char newline[] = "&";
-	char r_newline[] = "\n";
-	char dd;	
-	int fd;
-	int currentIndex = userMatrix.currentViewIndex;
-	char len[10];
-	char data[1000];
-
-	freqs = (char*)malloc(animations[currentIndex].melody.note_n * sizeof(int)+animations[currentIndex].melody.note_n * sizeof(char));
-	duras = (char*)malloc(animations[currentIndex].melody.note_n * sizeof(int)+animations[currentIndex].melody.note_n * sizeof(char));
-
-	
-	itoa(animations[currentIndex].melody.note_n, len);
-	strcat(data, len);
-
-
-	for (int iter = 0; iter < animations[currentIndex].melody.note_n; iter++) {
-		for (int i = 0; i < 10; i++) {
-        		buffer[i] = '\0';
-     		}
-		itoa(animations[currentIndex].melody.frequency[iter], buffer);
-		printf("buffer: %s \n", buffer);
-		strcat(freqs, buffer);
-		if(iter < animations[currentIndex].melody.note_n - 1){
-			strcat(freqs, space);
-		}
-
-	}
-	strcat(data,newline);
-	strcat(data,freqs);
-	printf("\n");
-	for (int iter = 0; iter < animations[currentIndex].melody.note_n; iter++) {
-		for (int i = 0; i < 10; i++) {
-        		buffer[i] = '\0';
-     		}
-		itoa(animations[currentIndex].melody.duration[iter], buffer);
-		printf("dur buffer: %s \n", buffer);
-		strcat(duras, buffer);
-		if(iter < animations[currentIndex].melody.note_n - 1){
-			strcat(duras, space);
-		}
-	}
-	printf("\n");
-	strcat(data, newline);
-	strcat(data, duras);
-	strcat(data, newline);
-	strcat(data, animations[currentIndex].name);
-	strcat(data, r_newline);
-
-
-	
-	if ((fd = serialOpen("/dev/ttyACM0", 9600)) < 0)
-   	{		
-      		fprintf(stderr, "Unable to open serial device: %s\n", strerror(errno));
-      		return NULL;
-   	}else{
-		printf("Serial Open!! \n");
-	}
-//	serialPuts(fd, len);
-//   	serialPuts(fd, freqs);
-//	serialPuts(fd, duras);
-	serialPuts(fd, data);
-
-	printf("-- printing arduino serial -- \n");
-	sleep(1); // wait for arduino return
-	while (serialDataAvail (fd))
-    	{
-      		printf ("%c", serialGetchar (fd)) ;
-      		//fflush (stdout) ;
-    	}
-	//printf("serial_recieved_data : %s \n", data);
-//	printf("serial_recieved_data : %c \n", dd);
-	//	
-
-	return NULL;
-
-}
-
-void itoa(int n, char s[])
-{
-     int i, sign;
-
-     if ((sign = n) < 0)  /* record sign */
-         n = -n;          /* make n positive */
-     i = 0;
-     do {       /* generate digits in reverse order */
-         s[i++] = n % 10 + '0';   /* get next digit */
-     } while ((n /= 10) > 0);     /* delete it */
-     if (sign < 0)
-         s[i++] = '-';
-     s[i] = '\0';
-     reverse(s);
-}  
-void reverse(char s[])
-{
-     int i, j;
-     char c;
-
-     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-         c = s[i];
-         s[i] = s[j];
-         s[j] = c;
-     }
-} 
 
 void printLEDDefault() {
 	
@@ -1295,10 +1235,6 @@ void printLedWeather(){
 
 void printLedData(){
 	// print reserved data according to cursor
-
-	//int rpinin=0, lpinin=0;		
-	//char data[500];
-	//char dd;
 	
 	for (int j = 0; j < animations[userMatrix.currentViewIndex].length; j++) {
 		if(userMatrix.currentViewIndex <  animation_n){
