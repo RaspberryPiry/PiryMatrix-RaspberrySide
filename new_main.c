@@ -18,6 +18,7 @@
 
 //hardware pins
 #define PUSHBTNPIN 23
+
 #define MOTIONPIN 24
 #define DMOVEPIN 25
 #define UMOVEPIN 27
@@ -34,7 +35,7 @@ typedef struct {
 	int hasMelody;
 	int note_n;
 	int* frequency;
-	int* duration; // 1 == 16∫–¿Ω«•, 4 == 4∫–¿Ω«•
+	int* duration; // 1 == 16Î∂ÑÏùåÌëú, 4 == 4Î∂ÑÏùåÌëú
 }Melody;
 
 typedef struct {
@@ -66,11 +67,14 @@ typedef struct {
 
 
 /*global variable*/
+
 Animation *animations;
+
 Animation *boot;
 Animation *weather;
 MatrixStatus userMatrix;
 History history;
+
 Weather weatherStatus;
 
 int animation_n;
@@ -81,7 +85,9 @@ int shift_flag=0;
 
 int boot_animation_n;
 int weather_animation_n;
+
 int screenToggle = 1; // 0 to turn off, 2 in sleep mode
+
 
 struct RGBLedMatrix *matrix;
 struct LedCanvas *realtime_canvas;
@@ -89,8 +95,10 @@ struct LedCanvas *realtime_canvas;
 
 /*method*/
 int dataload();
+
 int weatherload();
 int bootload();
+
 int loadImages(Animation *save, int *ani_n, char *dir);
 void printData();
 void printLED();
@@ -111,7 +119,9 @@ void printLedWeather();
 int *sendSerial();
 void itoa(int n, char s[]);
 void reverse(char s[]);
+
 void *sendSerialDummy();
+
 
 // signal handlers for led matrix delete
 void sigint_handler(int signum){
@@ -170,8 +180,10 @@ int main(int argc, char **argv) {
 	dataload();
 	bootload();
 	weatherload();
+
 	weatherStatus.currentWeather = 1;
 	userMatrix.isActive = digitalRead(MOTIONPIN);
+
 	//loadImages(weather, &weather_animation_n, wdir);
 	datasync();
 	printData();
@@ -239,6 +251,10 @@ void rightShift(){
 		history.lastIndex = userMatrix.currentViewIndex;
 	//	pthread_create(&serialThread, NULL, sendSerial, NULL);
 		printf("view index + 1 \n");
+
+	if(userMatrix.currentViewIndex < animation_n - 1){
+		pthread_create(&serialThread, NULL, sendSerial, NULL);
+	}
 		if(userMatrix.currentViewIndex < animation_n){
 			pthread_create(&serialThread, NULL, sendSerial, NULL);
 		}else{
@@ -248,7 +264,6 @@ void rightShift(){
 //	if(userMatrix.currentViewIndex < animation_n){
 //		pthread_create(&serialThread, NULL, sendSerial, NULL);
 //	}
-
 	printf("screen stat: %d index \n", userMatrix.currentViewIndex);
 	for(y = 31; y >= 0; y--){
 		size_count++;
@@ -288,14 +303,17 @@ void upShift(){
 	for(x = 0; x < 32; x++){
 		size_count++;
 		for(y = 0; y < 32; y++){
+
 			random_r = rand() % 50;
 			random_g = rand() % 50;
 			random_b = rand() % 50;					
 			led_canvas_set_pixel(realtime_canvas,y,x,x,0,2);
 			if(size_count > size){
+
 				led_canvas_set_pixel(realtime_canvas,y,x-size,0,0,0);
 			}
 			usleep(500);
+
 		}
 	}
 	usleep(100);
@@ -306,6 +324,7 @@ void upShift(){
 
 void downShift(){
 	// down to up
+
 	printf("down shift! \n");
 	int size = 5;
 	int i;
@@ -352,6 +371,8 @@ void downShift(){
 	led_canvas_clear(realtime_canvas);
 	shift_flag = 0;
 
+
+	printf("down shift! \n");
 }
 
 void offButton(){
@@ -393,6 +414,7 @@ void offButton(){
 	}
 }
 
+
 void initPin(){
 
 	wiringPiSetup();
@@ -400,8 +422,10 @@ void initPin(){
 	pinMode(RMOVEPIN, INPUT);
 	pinMode(UMOVEPIN, INPUT);
 	pinMode(DMOVEPIN, INPUT);
+
 	pinMode(MOTIONPIN, INPUT);
 	pinMode(PUSHBTNPIN, INPUT);
+
 
 	// attach interrupts
 	
@@ -412,6 +436,7 @@ void initPin(){
 	wiringPiISR(PUSHBTNPIN, INT_EDGE_RISING, offButton);
 	
 }
+
 
 
 
@@ -551,7 +576,6 @@ int dataload() {
 	}
 }
 
-
 int bootload() {
 	FILE* fp = fopen("boot.txt", "r");
 	if (fp != NULL) {
@@ -564,6 +588,7 @@ int bootload() {
 		int hasMelody = 0;
 		
 		// first free before data
+
 		free(boot);
 
 		/* Read file info */
@@ -572,17 +597,20 @@ int bootload() {
 		read_count = fscanf(fp, "%s %d", dummy, &boot_animation_n);
 		//getchar();
 		boot = (Animation*)malloc(sizeof(Animation) * boot_animation_n);
+
 	//	printf("read file info: a num: %d\n", animation_n);
 		/* Read data */
 		fseek(fp, 1, SEEK_CUR);
 		while (!feof(fp)) {
 			fgets(dummy, sizeof(dummy), fp); // read dummy : #animation index
+
 			read_count = fscanf(fp, " %s %s", dummy, boot[aniIndex].name); // read name
 			if(read_count == -1){
 				break;
 			}
 			read_count = fscanf(fp, " %s %d", dummy, &boot[aniIndex].length); // read length
 			boot[aniIndex].images = (Image*)malloc(sizeof(Image) * boot[aniIndex].length);
+
 			fseek(fp, 1, SEEK_CUR);
 	//		printf("readcount : %d, name: %s, length: %d\n", read_count, animations[aniIndex].name, animations[aniIndex].length);
 			/* read delay */
@@ -596,6 +624,7 @@ int bootload() {
 			while (tokptr != NULL) {
 	//			printf("token ptr : %s\n", tokptr);
 				if(tokptr != NULL){
+
 					boot[aniIndex].images[tokindex].delay = atoi(tokptr);
 					tokindex++;
 				}
@@ -608,16 +637,19 @@ int bootload() {
 			read_count = fscanf(fp, " %s %d", dummy, &hasMelody); // read hasMelody
 	//		printf("hasmelody : %d\n", hasMelody);
 			if (hasMelody == 1) { // has song
+
 				boot[aniIndex].melody.hasMelody = 1;
 
 				/* read num_of_note*/
 				read_count = fscanf(fp, " %s %d", dummy, &boot[aniIndex].melody.note_n);
+
 				fseek(fp, 1, SEEK_CUR);
 
 				/* read melody */
 				tokindex = 0;
 				fgets(dummy, sizeof(dummy), fp);
 				strcpy(buffer, dummy + 10);
+
 				boot[aniIndex].melody.frequency = (int*)malloc(sizeof(int) * boot[aniIndex].melody.note_n);
 				tokptr = strtok(buffer, " ");
 				while (tokptr != NULL) {
@@ -889,6 +921,7 @@ void loop(){
 		else if(userMatrix.isActive == 0){
 			printf("power save \n");
 		}
+
 		else if(userMatrix.screenOff == 1){
 			printf("screenOff \n");
 		}
@@ -1054,6 +1087,118 @@ void reverse(char s[])
      }
 } 
 
+int *sendSerial(){
+	
+	char *freqs;
+	char *duras;
+	char *title;
+	char buffer[10];
+	char space[] = "/";
+	char newline[] = "&";
+	char r_newline[] = "\n";
+	char dd;	
+	int fd;
+	int currentIndex = userMatrix.currentViewIndex;
+	char len[10];
+	char data[1000];
+
+	freqs = (char*)malloc(animations[currentIndex].melody.note_n * sizeof(int)+animations[currentIndex].melody.note_n * sizeof(char));
+	duras = (char*)malloc(animations[currentIndex].melody.note_n * sizeof(int)+animations[currentIndex].melody.note_n * sizeof(char));
+
+	
+	itoa(animations[currentIndex].melody.note_n, len);
+	strcat(data, len);
+
+
+	for (int iter = 0; iter < animations[currentIndex].melody.note_n; iter++) {
+		for (int i = 0; i < 10; i++) {
+        		buffer[i] = '\0';
+     		}
+		itoa(animations[currentIndex].melody.frequency[iter], buffer);
+		printf("buffer: %s \n", buffer);
+		strcat(freqs, buffer);
+		if(iter < animations[currentIndex].melody.note_n - 1){
+			strcat(freqs, space);
+		}
+
+	}
+	strcat(data,newline);
+	strcat(data,freqs);
+	printf("\n");
+	for (int iter = 0; iter < animations[currentIndex].melody.note_n; iter++) {
+		for (int i = 0; i < 10; i++) {
+        		buffer[i] = '\0';
+     		}
+		itoa(animations[currentIndex].melody.duration[iter], buffer);
+		printf("dur buffer: %s \n", buffer);
+		strcat(duras, buffer);
+		if(iter < animations[currentIndex].melody.note_n - 1){
+			strcat(duras, space);
+		}
+	}
+	printf("\n");
+	strcat(data, newline);
+	strcat(data, duras);
+	strcat(data, newline);
+	strcat(data, animations[currentIndex].name);
+	strcat(data, r_newline);
+
+
+	
+	if ((fd = serialOpen("/dev/ttyACM0", 9600)) < 0)
+   	{		
+      		fprintf(stderr, "Unable to open serial device: %s\n", strerror(errno));
+      		return NULL;
+   	}else{
+		printf("Serial Open!! \n");
+	}
+//	serialPuts(fd, len);
+//   	serialPuts(fd, freqs);
+//	serialPuts(fd, duras);
+	serialPuts(fd, data);
+
+	printf("-- printing arduino serial -- \n");
+	sleep(1); // wait for arduino return
+	while (serialDataAvail (fd))
+    	{
+      		printf ("%c", serialGetchar (fd)) ;
+      		//fflush (stdout) ;
+    	}
+	//printf("serial_recieved_data : %s \n", data);
+//	printf("serial_recieved_data : %c \n", dd);
+	//	
+
+	return NULL;
+
+}
+
+void itoa(int n, char s[])
+{
+     int i, sign;
+
+     if ((sign = n) < 0)  /* record sign */
+         n = -n;          /* make n positive */
+     i = 0;
+     do {       /* generate digits in reverse order */
+         s[i++] = n % 10 + '0';   /* get next digit */
+     } while ((n /= 10) > 0);     /* delete it */
+     if (sign < 0)
+         s[i++] = '-';
+     s[i] = '\0';
+     reverse(s);
+}  
+void reverse(char s[])
+{
+     int i, j;
+     char c;
+
+     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+         c = s[i];
+         s[i] = s[j];
+         s[j] = c;
+     }
+} 
+
 void printLEDDefault() {
 	
 	int speed = 2000;
@@ -1128,6 +1273,7 @@ void printLedWeather(){
 	int speed = 2000;
 	userMatrix.weatherViewFlag = 1;
 	
+
 	printf("printing weather! ");	
 	for (int j = 0; j < weather[weatherStatus.currentWeather].length; j++) {
 		if(userMatrix.currentViewIndex <  animation_n){
@@ -1149,6 +1295,7 @@ void printLedWeather(){
 
 void printLedData(){
 	// print reserved data according to cursor
+
 	//int rpinin=0, lpinin=0;		
 	//char data[500];
 	//char dd;
@@ -1175,10 +1322,10 @@ void printLedData(){
 
 
 void printMelody() {
-	int buzzerPin; // ¿”Ω√∑Œ
+	int buzzerPin; // ÏûÑÏãúÎ°ú
 	if (melodyOn) {
 		for (int noteIndex = 0; noteIndex < animations[animation_index].melody.note_n; noteIndex++) {
-			if (animations[animation_index].melody.frequency[noteIndex] != -1) { // -1¿œ ∞ÊøÏ rest
+			if (animations[animation_index].melody.frequency[noteIndex] != -1) { // -1Ïùº Í≤ΩÏö∞ rest
 				//Tone(buzzerPin, animations[animation_index].melody.frequency[noteIndex]);
 			}
 			//delay(1000 / 8 * animations[animation_index].melody.duration[noteIndex]);

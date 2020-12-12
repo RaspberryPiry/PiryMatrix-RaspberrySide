@@ -7,7 +7,7 @@ delay 1000
 hasMelody 1
 note_n 8
 frequency 1000 2000 3000 4000 5000 6000 7000 8000
-duration 10 20 30 40 50 60 70 80
+duration 100 200 300 40 500 600 700 800
 @IMAGE1
 ffcc33 ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff fffffc fbffff fdfff8 fcfffc fefffa fffbff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff 
 ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff fdfefd fffce6 ffefdf ffeedc fffaf0 fdfdfe fefefe ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff ffffff 
