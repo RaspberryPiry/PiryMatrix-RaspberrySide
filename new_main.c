@@ -130,32 +130,35 @@ void *sendSerialDummy();
 // signal handlers for led matrix delete
 void sigint_handler(int signum){
 
-	printf("closing... \n");	
+	printf("closing... \n");
+	system("sh ../../client/PiryServer/ws.sh");
 	led_matrix_delete(matrix);
 	exit(signum);
 }
-
 // multithread funcssdtions
 
 void *datathread(void *args){
 	printf("data thread active \n");
+	 // If you want to run socket process...
+        //system("sh wt.sh");
+        // If you want to stop socket process...
+        //system("sh ws.sh");
 
 	while(1){
-		sleep(30); // 100 seconds updat
-		printf("current ani num %d \n", animation_n);
-		printf("update ani n: %d \n", update_ani_n);
-		printf("history ani n: %d \n", history.anim_n);
-
+		sleep(3); // 100 seconds updat
+		//printf("current ani num %d \n", animation_n);
+		//printf("update ani n: %d \n", update_ani_n);
+		//printf("history ani n: %d \n", history.anim_n);
 		int res = dataload();
 		
 		sleep(2);
-		printf("after data ani num %d \n", animation_n);
+		//printf("after data ani num %d \n", animation_n);
 		
-		printf("update ani n: %d \n", update_ani_n);
-		printf("history ani n: %d \n", history.anim_n);
+		//printf("update ani n: %d \n", update_ani_n);
+		//printf("history ani n: %d \n", history.anim_n);
 		datasync();
-		printf("update ani n: %d \n", update_ani_n);
-		printf("history ani n: %d \n", history.anim_n);
+		//printf("update ani n: %d \n", update_ani_n);
+		//printf("history ani n: %d \n", history.anim_n);
 		printf("auto data retrieve: %d \n", res);
 		userMatrix.isActive = digitalRead(MOTIONPIN);
 		printf("userMatrix active: %d \n", userMatrix.isActive);
@@ -203,6 +206,7 @@ int main(int argc, char **argv) {
 
 	datasync();
 	printData();
+	system("sh ../../client/PiryServer/wt.sh");
 
 	//enter main loop
 
@@ -407,20 +411,26 @@ void offButton(){
 	int size_count = 0;
 	int random_r, random_g, random_b;
 	if(userMatrix.screenOff == 1){
-		myalarm(0);
+		myalarm(1);
 		printf("screen ONNNN \n");
+		// turn on socket 
+		system("sh ../../client/PiryServer/wt.sh");
+
 		userMatrix.screenOff = 0;
 	}else{
-		userMatrix.screenOff = 1; // turn screen off
-		myalarm(1);
+		userMatrix.screenOff = 1; // turn screen offi
+		//turn socket off 
+		system("sh ../../client/PiryServer/ws.sh");
+
+		myalarm(0);
 		printf("wait 1 sec \n");
 		sleep(1);
 		for(y = 31; y >= 0; y--){
 		for(x = 0; x < 32  ; x++){
 			led_canvas_set_pixel(realtime_canvas,x,y,x,y,x);
 			usleep(100);
+			}
 		}
-	}
 
 		for(y = 0; y < 15  ; y++){
 			for(x = 0; x < 32; x++){
@@ -430,18 +440,16 @@ void offButton(){
 			}
 			usleep(300);
 		}
-		sleep(1);
 		for(x = 16; x >= 0; x--){
 			for(y = 0; y < 32; y++){
-				led_canvas_set_pixel(realtime_canvas,31-x,y,0,0,0);
-				led_canvas_set_pixel(realtime_canvas,x,y,0,0,0);
-				usleep(500);
+					led_canvas_set_pixel(realtime_canvas,31-x,y,0,0,0);
+					led_canvas_set_pixel(realtime_canvas,x,y,0,0,0);
+					usleep(500);
 			}
 		}
 		userMatrix.screenOff = 1;
 	}
 }
-
 
 void initPin(){
 
@@ -470,8 +478,8 @@ void initPin(){
 	//FILE* fp = fopen("rgbdata.txt", "r");
 
 int dataload() {
-	//FILE* fp = fopen("../../client/PiryServer/clientUpload/data.txt", "r");
-	FILE* fp = fopen("rgbdata.txt", "r");
+	FILE* fp = fopen("../../client/PiryServer/clientUpload/data.txt", "r");
+	//FILE* fp = fopen("rgbdata.txt", "r");
 	if (fp != NULL) {
 		char dummy[BUFFER_SIZE], buffer[BUFFER_SIZE];
 		char* tokptr;
@@ -487,14 +495,14 @@ int dataload() {
 		/* Read file info */
 		fgets(dummy, sizeof(dummy), fp); // last update time
 		//getchar();
-		printf("dataload update n : %d \n", update_ani_n);
-		printf("dataload before ani_n : %d \n", animation_n);
+		//printf("dataload update n : %d \n", update_ani_n);
+		//printf("dataload before ani_n : %d \n", animation_n);
 		int ttemp = animation_n;
 		update_ani_n = ttemp;
 		history.anim_n = ttemp;
 		read_count = fscanf(fp, "%s %d", dummy, &animation_n);
-		printf("dataload after update n : %d \n", update_ani_n);
-		printf("dataload after ani_n : %d \n", animation_n);
+		//printf("dataload after update n : %d \n", update_ani_n);
+		//printf("dataload after ani_n : %d \n", animation_n);
 		//getchar();
 		animations = (Animation*)malloc(sizeof(Animation) * animation_n);
 		//printf("read file info: a num: %d\n", animation_n);
@@ -599,7 +607,7 @@ int dataload() {
        //        				printf("\n");
             			}
          		}
-         		printf("ani data load finish \n");
+         		//printf("ani data load finish \n");
          		aniIndex++;
       		}
 		fclose(fp);
@@ -910,7 +918,7 @@ void datasync(){
 		//update_ani_n = animation_n;
 		printf("update_n updated : %d \n", update_ani_n);
 		*update = animation_n;
-		myalarm(1);
+		myalarm(2);
 		//userMatrix.currentViewIndex = history.lastIndex; // uncomment to see latest in every update
 	}
 	else{
@@ -937,10 +945,10 @@ void printData() {
 //		printf("\n");		
 	}
 //	printf("boot len %d, \n", boot[0].length);
-//	for(int i =0; i < boot[0].length; i++){
+	for(int i =0; i < boot[0].length; i++){
 //		printf("len: %d \n", i);
-//		print_matrix(boot[0].images[i].pixels, realtime_canvas, boot[0].images[i].delay);
-//	}
+		print_matrix(boot[0].images[i].pixels, realtime_canvas, boot[0].images[i].delay);
+	}
 }
 
 
